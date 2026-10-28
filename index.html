@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Aventura de Sumas y Restas!</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts para tipografía redondeada e infantil -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- Canvas-Confetti library para fuegos artificiales al ganar -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Fredoka', 'Comic Sans MS', sans-serif;
+            background: linear-gradient(135deg, #a8edd9 0%, #fed6e3 100%);
+            touch-action: manipulation;
+        }
+
+        /* Botones y sombras estilo 3D divertidas */
+        .btn-game {
+            transition: all 0.15s ease-in-out;
+            box-shadow: 0px 8px 0px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-game:hover {
+            transform: translateY(-2px);
+            box-shadow: 0px 10px 0px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-game:active {
+            transform: translateY(4px);
+            box-shadow: 0px 4px 0px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Animaciones */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(2deg); }
+        }
+
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse-shake {
+            0% { transform: scale(1); }
+            25% { transform: scale(1.1) rotate(-3deg); }
+            50% { transform: scale(1.1) rotate(3deg); }
+            75% { transform: scale(1.1) rotate(-3deg); }
+            100% { transform: scale(1); }
+        }
+
+        .shake-error {
+            animation: pulse-shake 0.4s ease-in-out;
+        }
+
+        @keyframes pop-success {
+            0% { transform: scale(0.8); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .pop-correct {
+            animation: pop-success 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Barra de progreso fluida */
+        .progress-bar-fill {
+            transition: width 0.4s ease-out;
+        }
+
+        /* Animar la barra del temporizador */
+        .timer-fill {
+            transition: width 1s linear, background-color 0.5s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-3 sm:p-6 select-none">
+
+    <!-- Card Principal del Juego -->
+    <div class="bg-white/90 backdrop-blur-md border-4 border-white rounded-3xl shadow-2xl p-4 sm:p-8 w-full max-w-xl text-center relative overflow-hidden">
+        
+        <!-- PANTALLA DE INICIO -->
+        <div id="start-screen" class="space-y-6 py-4">
+            <div class="text-6xl sm:text-7xl floating">🚀 MathKids 🎉</div>
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-purple-600 tracking-wide">
+                ¡Super Sabios de los Números!
+            </h1>
+            <p class="text-lg sm:text-xl text-gray-600 font-medium leading-relaxed">
+                ¿Estás listo para resolver 5 supermisiones de sumas y restas? <br>
+                ⏱️ Tienes <strong>20 segundos</strong> por cada una. ¡Tú puedes! 💪
+            </p>
+            <button onclick="startGame()" class="btn-game bg-emerald-400 hover:bg-emerald-500 text-white font-bold text-2xl sm:text-3xl py-4 px-10 rounded-full w-full max-w-xs transition shadow-lg border-b-4 border-emerald-600">
+                ¡JUGAR AHORA! 🎮
+            </button>
+        </div>
+
+        <!-- PANTALLA DE JUEGO -->
+        <div id="game-screen" class="hidden space-y-5">
+            
+            <!-- Barra Superior: Pregunta N.º y Puntuación -->
+            <div class="flex justify-between items-center bg-purple-100 rounded-2xl p-3 sm:p-4 text-purple-800 font-bold">
+                <div class="flex items-center space-x-2 text-lg sm:text-xl">
+                    <span>📍 Pregunta:</span>
+                    <span id="question-number" class="bg-purple-600 text-white px-3 py-1 rounded-xl">1/5</span>
+                </div>
+                <div class="flex items-center space-x-2 text-lg sm:text-xl">
+                    <span>⭐ Puntos:</span>
+                    <span id="score-display" class="bg-amber-400 text-white px-3 py-1 rounded-xl text-2xl">0</span>
+                </div>
+            </div>
+
+            <!-- Temporizador Visual -->
+            <div class="space-y-1">
+                <div class="flex justify-between text-sm font-bold text-gray-500 px-1">
+                    <span>⏱️ Tiempo restante</span>
+                    <span id="timer-text" class="text-purple-600 font-extrabold">20s</span>
+                </div>
+                <div class="w-full bg-gray-200 h-5 rounded-full overflow-hidden p-1 shadow-inner">
+                    <div id="timer-bar" class="timer-fill bg-emerald-400 h-full rounded-full w-full"></div>
+                </div>
+            </div>
+
+            <!-- Ilustración Visual de Objetos para Apoyo Gráfico -->
+            <div id="visual-counting" class="flex flex-wrap justify-center items-center gap-2 min-h-[48px] p-2 bg-yellow-50 rounded-2xl border-2 border-dashed border-yellow-200">
+                <!-- Emojis representativos generados dinámicamente -->
+            </div>
+
+            <!-- Expresión Matemática Grande -->
+            <div class="bg-sky-100 rounded-3xl p-4 sm:p-6 border-4 border-sky-200 shadow-inner">
+                <div id="math-problem" class="text-5xl sm:text-6xl font-extrabold text-sky-700 tracking-wider">
+                    8 + 5 = ?
+                </div>
+            </div>
+
+            <!-- Opciones de Respuesta en Cuadrícula 2x2 -->
+            <div id="options-container" class="grid grid-cols-2 gap-3 sm:gap-4 pt-2">
+                <!-- Generados con JavaScript -->
+            </div>
+
+            <!-- Mensaje de Feedback (Acierto/Error) -->
+            <div id="feedback-message" class="min-h-[50px] flex items-center justify-center text-xl sm:text-2xl font-bold transition-all">
+                <!-- Contenido dinámico -->
+            </div>
+
+            <!-- Botón Siguiente Pregunta -->
+            <button id="next-btn" onclick="nextQuestion()" class="hidden btn-game bg-purple-500 hover:bg-purple-600 text-white font-bold text-xl sm:text-2xl py-3 px-8 rounded-2xl w-full border-b-4 border-purple-700">
+                Siguiente Pregunta ➡️
+            </button>
+        </div>
+
+        <!-- PANTALLA FINAL (RESULTADOS) -->
+        <div id="end-screen" class="hidden space-y-6 py-4">
+            <div id="final-emoji" class="text-7xl sm:text-8xl floating">🏆</div>
+            <h2 id="final-title" class="text-3xl sm:text-4xl font-extrabold text-purple-700">
+                ¡Campaña Completada!
+            </h2>
+            <p id="final-message" class="text-xl text-gray-600 font-medium px-2">
+                ¡Hiciste un trabajo increíble resolviendo los problemas!
+            </p>
+
+            <!-- Cuadro Resumen -->
+            <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 max-w-sm mx-auto space-y-2">
+                <div class="text-gray-600 font-bold text-lg">Resumen de tu aventura:</div>
+                <div class="text-3xl font-extrabold text-amber-600">
+                    <span id="final-score">0</span> de 5 acertadas ✨
+                </div>
+            </div>
+
+            <button onclick="startGame()" class="btn-game bg-emerald-400 hover:bg-emerald-500 text-white font-bold text-2xl py-4 px-10 rounded-full w-full max-w-xs transition border-b-4 border-emerald-600">
+                ¡JUGAR OTRA VEZ! 🔄
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- ESTADO DEL JUEGO ---
+        const TOTAL_QUESTIONS = 5;
+        const TIME_LIMIT = 20; // Segundos por pregunta
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let timeLeft = TIME_LIMIT;
+        let timerInterval = null;
+        let currentProblem = null;
+        let answered = false;
+
+        // Emojis divertidos para acompañar el aprendizaje
+        const icons = ['🍎', '⭐️', '🎈', '🐸', '🐱', '🚀', '🍩', '🍪', '🐶', '⚽'];
+
+        // Web Audio API para efectos de sonido simples sin depender de archivos externos
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'correct') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.3); // A5
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, audioCtx.currentTime); // A3
+                osc.frequency.exponentialRampToValueAtTime(130, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.05);
+            }
+        }
+
+        // Generador de preguntas adaptadas a 2.º de Primaria (Números del 1 al 20)
+        function generateProblem() {
+            const isAddition = Math.random() > 0.5;
+            let num1, num2, answer;
+
+            if (isAddition) {
+                // Sumas con resultado <= 20
+                num1 = Math.floor(Math.random() * 11) + 1; // 1 a 11
+                num2 = Math.floor(Math.random() * (20 - num1)) + 1; // que la suma no supere 20
+                answer = num1 + num2;
+            } else {
+                // Restas con minuendo <= 20 y sin resultados negativos
+                num1 = Math.floor(Math.random() * 18) + 3; // 3 a 20
+                num2 = Math.floor(Math.random() * num1) + 1; // menor o igual que num1
+                answer = num1 - num2;
+            }
+
+            // Generar 3 opciones incorrectas distintas y cercanas a la correcta
+            const options = new Set();
+            options.add(answer);
+
+            while (options.size < 4) {
+                let offset = (Math.floor(Math.random() * 3) + 1) * (Math.random() < 0.5 ? 1 : -1);
+                let fakeAnswer = answer + offset;
+                if (fakeAnswer >= 0 && fakeAnswer <= 20) {
+                    options.add(fakeAnswer);
+                }
+            }
+
+            return {
+                num1,
+                num2,
+                operator: isAddition ? '+' : '-',
+                answer,
+                options: Array.from(options).sort(() => Math.random() - 0.5)
+            };
+        }
+
+        // --- FUNCIONES DE CONTROL DEL JUEGO ---
+
+        function startGame() {
+            playSound('click');
+            currentQuestionIndex = 0;
+            score = 0;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            answered = false;
+            currentProblem = generateProblem();
+            
+            // Actualizar Marcadores
+            document.getElementById('question-number').innerText = `${currentQuestionIndex + 1}/${TOTAL_QUESTIONS}`;
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('math-problem').innerText = `${currentProblem.num1} ${currentProblem.operator} ${currentProblem.num2} = ?`;
+            
+            // Limpiar Feedback y Botón Siguiente
+            const feedbackEl = document.getElementById('feedback-message');
+            feedbackEl.innerText = '';
+            feedbackEl.className = 'min-h-[50px] flex items-center justify-center text-xl sm:text-2xl font-bold transition-all';
+            document.getElementById('next-btn').classList.add('hidden');
+
+            // Representación gráfica visual (Contar con Emojis)
+            renderVisualSupport(currentProblem);
+
+            // Generar Botones de Opciones
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+
+            const colors = [
+                'bg-pink-400 hover:bg-pink-500 border-pink-600',
+                'bg-blue-400 hover:bg-blue-500 border-blue-600',
+                'bg-amber-400 hover:bg-amber-500 border-amber-600',
+                'bg-emerald-400 hover:bg-emerald-500 border-emerald-600'
+            ];
+
+            currentProblem.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `btn-game ${colors[idx % colors.length]} text-white text-4xl font-extrabold py-5 rounded-2xl shadow-lg border-b-4 text-center w-full transition transform`;
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(opt, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            // Iniciar Temporizador
+            resetTimer();
+        }
+
+        // Ilustración visual sencilla para apoyar el conteo
+        function renderVisualSupport(problem) {
+            const visualContainer = document.getElementById('visual-counting');
+            visualContainer.innerHTML = '';
+            const randomIcon = icons[Math.floor(Math.random() * icons.length)];
+
+            if (problem.operator === '+') {
+                const grp1 = document.createElement('div');
+                grp1.className = 'flex flex-wrap justify-center gap-1';
+                grp1.innerHTML = Array(problem.num1).fill(`<span>${randomIcon}</span>`).join('');
+                
+                const plus = document.createElement('span');
+                plus.className = 'text-xl font-black text-gray-400 mx-2 self-center';
+                plus.innerText = '+';
+
+                const grp2 = document.createElement('div');
+                grp2.className = 'flex flex-wrap justify-center gap-1';
+                grp2.innerHTML = Array(problem.num2).fill(`<span>${randomIcon}</span>`).join('');
+
+                visualContainer.appendChild(grp1);
+                visualContainer.appendChild(plus);
+                visualContainer.appendChild(grp2);
+            } else {
+                // Resta: mostrar total y tachados o simples
+                const grp = document.createElement('div');
+                grp.className = 'flex flex-wrap justify-center gap-1';
+                
+                let html = '';
+                for (let i = 0; i < problem.num1; i++) {
+                    if (i >= problem.num1 - problem.num2) {
+                        html += `<span class="opacity-30 line-through grayscale">${randomIcon}</span>`;
+                    } else {
+                        html += `<span>${randomIcon}</span>`;
+                    }
+                }
+                grp.innerHTML = html;
+                visualContainer.appendChild(grp);
+            }
+        }
+
+        // Gestión del Temporizador
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timeLeft = TIME_LIMIT;
+            updateTimerUI();
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerUI();
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeout();
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            const timerBar = document.getElementById('timer-bar');
+            const timerText = document.getElementById('timer-text');
+            const percentage = (timeLeft / TIME_LIMIT) * 100;
+
+            timerBar.style.width = `${percentage}%`;
+            timerText.innerText = `${timeLeft}s`;
+
+            if (timeLeft > 10) {
+                timerBar.className = 'timer-fill bg-emerald-400 h-full rounded-full';
+            } else if (timeLeft > 5) {
+                timerBar.className = 'timer-fill bg-amber-400 h-full rounded-full';
+            } else {
+                timerBar.className = 'timer-fill bg-rose-500 h-full rounded-full';
+            }
+        }
+
+        function handleTimeout() {
+            if (answered) return;
+            answered = true;
+            playSound('error');
+
+            disableOptionButtons();
+
+            const feedbackEl = document.getElementById('feedback-message');
+            feedbackEl.innerHTML = `⏰ <span class="text-rose-500 ml-2">¡Se acabó el tiempo! La respuesta era ${currentProblem.answer}</span>`;
+            feedbackEl.classList.add('shake-error');
+
+            highlightCorrectAnswer();
+            showNextButton();
+        }
+
+        // Comprobación de Respuesta
+        function checkAnswer(selectedOption, selectedBtn) {
+            if (answered) return;
+            answered = true;
+            clearInterval(timerInterval);
+
+            disableOptionButtons();
+
+            const feedbackEl = document.getElementById('feedback-message');
+
+            if (selectedOption === currentProblem.answer) {
+                // Acierto
+                score++;
+                playSound('correct');
+                document.getElementById('score-display').innerText = score;
+
+                selectedBtn.classList.add('ring-8', 'ring-emerald-300', 'pop-correct');
+                feedbackEl.innerHTML = `🌟 <span class="text-emerald-600 ml-2">¡Excelente! ¡Lo hiciste superbién! 🎉</span>`;
+                
+                // Lanzar confeti pequeño para cada acierto
+                confetti({
+                    particleCount: 40,
+                    spread: 60,
+                    origin: { y: 0.7 }
+                });
+
+            } else {
+                // Error
+                playSound('error');
+                selectedBtn.classList.add('opacity-50', 'bg-gray-400', 'shake-error');
+                
+                feedbackEl.innerHTML = `💡 <span class="text-rose-500 ml-2">¡Casi! La respuesta correcta era ${currentProblem.answer}</span>`;
+                highlightCorrectAnswer();
+            }
+
+            showNextButton();
+        }
+
+        function highlightCorrectAnswer() {
+            const buttons = document.querySelectorAll('#options-container button');
+            buttons.forEach(btn => {
+                if (parseInt(btn.innerText) === currentProblem.answer) {
+                    btn.classList.add('ring-8', 'ring-emerald-400', 'bg-emerald-500');
+                }
+            });
+        }
+
+        function disableOptionButtons() {
+            const buttons = document.querySelectorAll('#options-container button');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.classList.add('cursor-not-allowed');
+            });
+        }
+
+        function showNextButton() {
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.classList.remove('hidden');
+            if (currentQuestionIndex === TOTAL_QUESTIONS - 1) {
+                nextBtn.innerText = 'Ver mi gran final 🏆';
+            } else {
+                nextBtn.innerText = 'Siguiente pregunta ➡️';
+            }
+        }
+
+        function nextQuestion() {
+            playSound('click');
+            currentQuestionIndex++;
+
+            if (currentQuestionIndex < TOTAL_QUESTIONS) {
+                loadQuestion();
+            } else {
+                showEndScreen();
+            }
+        }
+
+        // Pantalla Final de Motivación
+        function showEndScreen() {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.remove('hidden');
+
+            document.getElementById('final-score').innerText = score;
+
+            const finalTitle = document.getElementById('final-title');
+            const finalMessage = document.getElementById('final-message');
+            const finalEmoji = document.getElementById('final-emoji');
+
+            if (score === 5) {
+                finalEmoji.innerText = '👑';
+                finalTitle.innerText = '¡PERFECTO! ¡ERES UN GENIO!';
+                finalMessage.innerText = '¡Increíble! Contestaste todas las preguntas correctamente. ¡El reino de las matemáticas te celebra! 🌈✨';
+                // Gran explosión de confeti
+                confetti({
+                    particleCount: 120,
+                    spread: 100,
+                    origin: { y: 0.5 }
+                });
+            } else if (score >= 3) {
+                finalEmoji.innerText = '🌟';
+                finalTitle.innerText = '¡MUY BIEN HECHO!';
+                finalMessage.innerText = '¡Demostraste una gran valentía y destreza con los números! ¡Sigue así! 🚀';
+            } else {
+                finalEmoji.innerText = '🐥';
+                finalTitle.innerText = '¡BUEN INTENTO!';
+                finalMessage.innerText = '¡Paso a paso se llega muy lejos! Con un poco más de práctica serás un maestro de los números. 💪';
+            }
+        }
+    </script>
+</body>
+</html>
